@@ -15,7 +15,6 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-
 /**
  * Adds data to the cache, if the cache key does not already exist.
  *
@@ -275,7 +274,7 @@ class WP_Object_Cache
     /**
      * @var string Slug of the current blog name
      */
-    private $blog_name = '';
+    private $base_name = '';
 
 
     /**
@@ -346,20 +345,20 @@ class WP_Object_Cache
     /**
      * Direct access to __construct not allowed.
      */
-    private function __construct()
+    public function __construct()
     {
         global $blog_id;
 
         if (!defined('WP_OPCACHE_KEY_SALT')) {
             /**
              * Set in config if you are using some sort of shared
-             * config where blog_name is the same on all sites
+             * config where base_name is the same on all sites
              */
             define('WP_OPCACHE_KEY_SALT', 'wp-opcache');
         }
 
-        $this->directory    = get_temp_dir() . 'cache';
-        $this->blog_name    = sanitize_title_with_dashes(get_blog_info('name'));
+        $this->directory    = WP_CONTENT_DIR . '/cache';
+        $this->base_name    = basename(ABSPATH);
         $this->enabled      = extension_loaded('OPcache') && ini_get('opcache.enable');
         $this->multi_site   = is_multisite();
         $this->blog_prefix  = $this->multi_site ? (int) $blog_id : 1;
@@ -382,7 +381,7 @@ class WP_Object_Cache
      */
     public function add($key, $var, $group = 'default', $ttl = 0)
     {
-        if (wp_suspend_cache_addition() || $this->_exists($this->_key($key, $group))) {
+        if (wp_suspend_cache_addition() || $this->exists($this->buildKey($key, $group))) {
             return false;
         }
 
@@ -408,7 +407,7 @@ class WP_Object_Cache
     /**
      * Decrement numeric cache item's value
      *
-     * @param int|string $key    The cache key to increment
+     * @param int|string $key    The cache key to decrement
      * @param int        $offset The amount by which to decrement the item's value. Default is 1.
      * @param string     $group  The group the key is in.
      *
@@ -435,7 +434,7 @@ class WP_Object_Cache
     {
         unset($deprecated);
 
-        $key = $this->_key($key, $group);
+        $key = $this->buildKey($key, $group);
 
         if ($this->enabled) {
             opcache_invalidate($this->filePath($key), true);
@@ -451,7 +450,7 @@ class WP_Object_Cache
      *
      * @return bool True if cache key exists else false
      */
-    private function _exists($key)
+    private function exists($key)
     {
         return $this->enabled && opcache_is_script_cached($this->filePath($key))
                 || file_exists($this->filePath($key));
@@ -546,7 +545,7 @@ class WP_Object_Cache
     {
         unset($force);
 
-        @include $this->filePath($this->_key($key, $group));
+        @include $this->filePath($this->buildKey($key, $group));
 
         $success = true;
 
@@ -554,17 +553,6 @@ class WP_Object_Cache
             $var = null;
             $success = false;
         }
-
-        /*
-        if (is_object($var) && 'ArrayObject' === get_class($var)) {
-            $var = $var->getArrayCopy();
-        } elseif (is_object($var)) {
-            $var = clone $var;
-        } else {
-            $success = false;
-            $var = null;
-        }
-        */
         
         if ($success) {
             $this->cache_hits++;
@@ -625,11 +613,11 @@ class WP_Object_Cache
      */
     public function incr($key, $offset = 1, $group = 'default')
     {
-        if (!$this->_exists($this->_key($key, $group))) {
+        if (!$this->exists($this->buildKey($key, $group))) {
             return false;
         }
 
-        $var = (int) $this->get($key, $group) + max(intval($offset), 0);
+        $var = (int) $this->get($key, $group) + $offset;
         return $this->set($key, $var, $group) ? $var : false;
     }
 
@@ -642,7 +630,7 @@ class WP_Object_Cache
      *
      * @return string Returns the calculated cache key
      */
-    private function _key($key, $group = 'default')
+    public function buildKey($key, $group = 'default')
     {
         $prefix = 0;
 
@@ -650,7 +638,7 @@ class WP_Object_Cache
             $prefix = $this->blog_prefix;
         }
 
-        return $this->blog_name . ':' . $prefix . ':' . $group . ':' . $key;
+        return $this->base_name . ':' . $prefix . ':' . $group . ':' . $key;
     }
 
 
@@ -666,7 +654,7 @@ class WP_Object_Cache
      */
     public function replace($key, $var, $group = 'default', $ttl = 0)
     {
-        if (!$this->_exists($this->_key($key, $group))) {
+        if (!$this->exists($this->buildKey($key, $group))) {
             return false;
         }
 
@@ -686,7 +674,7 @@ class WP_Object_Cache
      */
     public function set($key, $var, $group = 'default', $ttl = 0)
     {
-        $key = $this->_key($key, $group);
+        $key = $this->buildKey($key, $group);
 
         $ttl = max(intval($ttl), 0);
 
@@ -721,7 +709,7 @@ class WP_Object_Cache
      */
     protected function filePath($key)
     {
-        return $this->directory . '/' . WP_OPCACHE_KEY_SALT . '-' . sanitize_title_with_dashes($key);
+        return $this->directory . '/' . WP_OPCACHE_KEY_SALT . '-' . sha1($key);
     }
 
 
@@ -820,7 +808,7 @@ class WP_Object_Cache
     /**
      * @return boolean
      */
-    public function getMultiSite()
+    public function get_multiSite()
     {
         return $this->multi_site;
     }
