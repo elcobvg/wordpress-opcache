@@ -74,9 +74,9 @@ class OpcacheUnitTestsGet extends OpcacheUnitTests
         $this->assertTrue($this->object_cache->delete($key, $group));
 
         // Verify that false is returned
-        $this->assertNull($this->object_cache->get($key, $group, false, $found));
+        $this->assertFalse($this->object_cache->get($key, $group, false, $found));
 
-        // Verify that found variable is set to true because the item was found
-        $this->assertTrue($found);
+        // Verify that found variable is set to false because the item was deleted and not found
+        $this->assertFalse($found);
     }
 }

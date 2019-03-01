@@ -26,7 +26,7 @@ class OpcacheUnitTestsReplace extends OpcacheUnitTests
 
         $this->assertFalse($this->object_cache->replace($key, $value));
 
-        $this->assertNull($this->object_cache->get($key));
+        $this->assertFalse($this->object_cache->get($key));
     }
 
     public function test_replace_with_expiration_of_30_days()

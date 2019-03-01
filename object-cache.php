@@ -316,6 +316,8 @@ class WP_Object_Cache
      */
     private $multi_site = false;
 
+    protected $start_time;
+
 
     /**
      * Singleton. Return instance of WP_Object_Cache
@@ -362,6 +364,7 @@ class WP_Object_Cache
         $this->enabled      = extension_loaded('OPcache') && ini_get('opcache.enable');
         $this->multi_site   = is_multisite();
         $this->blog_prefix  = $this->multi_site ? (int) $blog_id : 1;
+        $this->start_time   = isset( $_SERVER['REQUEST_TIME'] ) ? $_SERVER['REQUEST_TIME'] : time();
 
         if (!file_exists($this->directory)) {
             mkdir($this->directory, 0755, true);
@@ -543,15 +546,21 @@ class WP_Object_Cache
      */
     public function get($key, $group = 'default', $force = false, &$success = null)
     {
-        unset($force);
+        $result = @include $this->filePath($this->buildKey($key, $group));
 
-        @include $this->filePath($this->buildKey($key, $group));
+        if ( false === $result ) {
+        	// file did not exist.
+	        $success = false;
+	        $var =  false;
+        } else {
+        	$success = true;
+	        list( $exp, $var ) = $result;
 
-        $success = true;
-
-        if (isset($exp) && $exp < time()) {
-            $var = null;
-            $success = false;
+	        if ( $exp < time() ) {
+	        	// cache expired.
+		        $var = false;
+		        $success = false;
+	        }
         }
         
         if ($success) {
@@ -560,7 +569,7 @@ class WP_Object_Cache
             $this->cache_misses++;
         }
 
-        return isset($var) ? $var : null;
+        return $var;
     }
 
 
@@ -580,7 +589,7 @@ class WP_Object_Cache
     public function get_multi($groups)
     {
         if (empty($groups) || !is_array($groups)) {
-            return false;
+            return array();
         }
 
         $vars    = array();
@@ -709,7 +718,7 @@ class WP_Object_Cache
      */
     protected function filePath($key)
     {
-        return $this->directory . '/' . WP_OPCACHE_KEY_SALT . '-' . sha1($key);
+        return $this->directory . '/' . WP_OPCACHE_KEY_SALT . '-' . sha1($key) . '.php';
     }
 
 
@@ -724,9 +733,16 @@ class WP_Object_Cache
     protected function writeFile($key, $exp, $var)
     {
         // Write to temp file first to ensure atomicity. Use crc32 for speed
-        $tmp = $this->directory . '/' . crc32($key) . '-' . uniqid('', true) . '.tmp';
-        file_put_contents($tmp, '<?php $exp = ' . $exp . '; $var = ' . $var . ';', LOCK_EX);
-        return rename($tmp, $this->filePath($key));
+        $tmp = $this->directory . '/' . crc32( $key ) . '-' . uniqid( '', true ) . '.tmp';
+        file_put_contents( $tmp, '<?php return array('. $exp . ',' . $var . ');', LOCK_EX );
+        $file_path = $this->filePath( $key );
+        touch( $file_path, $this->start_time - 10 );
+        $return = rename( $tmp, $file_path );
+
+	    @opcache_invalidate( $file_path, true );
+	    @opcache_compile_file( $file_path );
+
+	    return $return;
     }
 
 
@@ -740,25 +756,6 @@ class WP_Object_Cache
     {
         return $seconds === 0 ? 9999999999 : strtotime('+' . $seconds . ' seconds');
     }
-
-
-    /**
-     * Extend expiration time with given seconds
-     *
-     * @param  string $key
-     * @param  int    $seconds
-     * @return bool
-     */
-    public function extendExpiration($key, $seconds = 60)
-    {
-        @include $this->filePath($key);
-
-        if (isset($exp)) {
-            $extended = strtotime('+' . $seconds . ' seconds', $exp);
-            return $this->writeFile($key, $extended, var_export($var, true));
-        }
-    }
-
 
     /**
      * @return boolean
