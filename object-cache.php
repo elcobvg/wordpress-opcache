@@ -739,8 +739,10 @@ class WP_Object_Cache
         touch( $file_path, $this->start_time - 10 );
         $return = rename( $tmp, $file_path );
 
-	    @opcache_invalidate( $file_path, true );
-	    @opcache_compile_file( $file_path );
+        if ( $this->enabled ) {
+	        @opcache_invalidate( $file_path, true );
+	        @opcache_compile_file( $file_path );
+        }
 
 	    return $return;
     }
