@@ -22,7 +22,7 @@ class OpcacheUnitTestsAll extends OpcacheUnitTests
         $this->assertTrue($this->object_cache->flush());
 
         // Make sure value is no longer available
-        $this->assertNull($this->object_cache->get($key));
+        $this->assertFalse($this->object_cache->get($key));
     }
 
     public function test_switch_to_blog()
