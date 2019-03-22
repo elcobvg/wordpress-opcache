@@ -595,6 +595,7 @@ class WP_Object_Cache
         } else {
         	$success = true;
 	        list( $exp, $var ) = $result;
+
 	        if ( is_object( $var ) ) {
 		        $this->cache[ $group ][ $key ] = clone $var;
 	        } else {
@@ -742,7 +743,13 @@ class WP_Object_Cache
 
         $ttl = max(intval($ttl), 0);
 
-        $var = var_export($var, true);
+        if ( is_object($var) && ! method_exists($var, '__set_state') && ! $var instanceof stdClass ) {
+            $var = serialize($var);
+	        $var = var_export($var, true);
+	        $var = 'unserialize('.$var.')';
+        } else {
+	        $var = var_export($var, true);
+        }
 
         // HHVM fails at __set_state, so just use object cast for now
         $var = str_replace('stdClass::__set_state', '(object)', $var);
