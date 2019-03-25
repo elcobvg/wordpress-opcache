@@ -266,6 +266,15 @@ function wp_cache_flush_group($groups = 'default')
  */
 class WP_Object_Cache
 {
+
+	/**
+	 * Holds the cached objects.
+	 *
+	 * @since 2.0.0
+	 * @var array
+	 */
+	private $cache = array();
+
     /**
      * @var string The file cache directory.
      */
@@ -361,7 +370,7 @@ class WP_Object_Cache
 
         $this->directory    = WP_CONTENT_DIR . '/cache';
         $this->base_name    = basename(ABSPATH);
-        $this->enabled      = extension_loaded('OPcache') && ini_get('opcache.enable');
+        $this->enabled      = function_exists('opcache_invalidate') && ('cli' !== \PHP_SAPI || filter_var(ini_get('opcache.enable_cli'), FILTER_VALIDATE_BOOLEAN)) && filter_var(ini_get('opcache.enable'), FILTER_VALIDATE_BOOLEAN);
         $this->multi_site   = is_multisite();
         $this->blog_prefix  = $this->multi_site ? (int) $blog_id : 1;
         $this->start_time   = isset( $_SERVER['REQUEST_TIME'] ) ? $_SERVER['REQUEST_TIME'] : time();
@@ -384,9 +393,12 @@ class WP_Object_Cache
      */
     public function add($key, $var, $group = 'default', $ttl = 0)
     {
-        if (wp_suspend_cache_addition() || $this->exists($this->buildKey($key, $group))) {
+        if (wp_suspend_cache_addition() || $this->exists( $key, $group )) {
             return false;
         }
+	    if ( $this->multi_site && ! isset( $this->global_groups[ $group ] ) ) {
+		    $key = $this->blog_prefix . $key;
+	    }
 
         return $this->set($key, $var, $group, $ttl);
     }
@@ -450,13 +462,20 @@ class WP_Object_Cache
      * Checks if the cached OPcache key exists
      *
      * @param string $key What the contents in the cache are called
+     * @param string $group Where the cache contents are grouped
      *
      * @return bool True if cache key exists else false
      */
-    private function exists($key)
+    private function exists($key, $group)
     {
-        return $this->enabled && opcache_is_script_cached($this->filePath($key))
-                || file_exists($this->filePath($key));
+	    if ( isset($this->cache[ $group ]) && ( isset($this->cache[ $group ][ $key ]) || array_key_exists($key, $this->cache[ $group ]))) {
+			return true;
+	    }
+
+	    $key = $this->buildKey($key, $group);
+
+	    return $this->enabled && opcache_is_script_cached($this->filePath($key))
+            || file_exists($this->filePath($key));
     }
 
 
@@ -546,8 +565,29 @@ class WP_Object_Cache
      */
     public function get($key, $group = 'default', $force = false, &$success = null)
     {
-        $result = @include $this->filePath($this->buildKey($key, $group));
+    	if ( ! $key ) {
+    		$success = false;
+    		return false;
+	    }
+	    if ( empty( $group ) ) {
+		    $group = 'default';
+	    }
 
+	    if ( $this->multi_site && ! isset( $this->global_groups[ $group ] ) ) {
+		    $key = $this->blog_prefix . $key;
+	    }
+
+	    if ( isset( $this->cache[ $group ] ) && ( isset( $this->cache[ $group ][ $key ] ) || array_key_exists( $key, $this->cache[ $group ] ) ) ) {
+		    $success             = true;
+		    $this->cache_hits += 1;
+		    if ( is_object( $this->cache[ $group ][ $key ] ) ) {
+			    return clone $this->cache[ $group ][ $key ];
+		    } else {
+			    return $this->cache[ $group ][ $key ];
+		    }
+	    }
+
+        $result = @include $this->filePath($this->buildKey($key, $group));
         if ( false === $result ) {
         	// file did not exist.
 	        $success = false;
@@ -555,6 +595,12 @@ class WP_Object_Cache
         } else {
         	$success = true;
 	        list( $exp, $var ) = $result;
+
+	        if ( is_object( $var ) ) {
+		        $this->cache[ $group ][ $key ] = clone $var;
+	        } else {
+		        $this->cache[ $group ][ $key ] = $var;
+	        }
 
 	        if ( $exp < time() ) {
 	        	// cache expired.
@@ -622,7 +668,7 @@ class WP_Object_Cache
      */
     public function incr($key, $offset = 1, $group = 'default')
     {
-        if (!$this->exists($this->buildKey($key, $group))) {
+        if (!$this->exists($key, $group)) {
             return false;
         }
 
@@ -663,7 +709,7 @@ class WP_Object_Cache
      */
     public function replace($key, $var, $group = 'default', $ttl = 0)
     {
-        if (!$this->exists($this->buildKey($key, $group))) {
+        if (!$this->exists($key, $group)) {
             return false;
         }
 
@@ -683,11 +729,27 @@ class WP_Object_Cache
      */
     public function set($key, $var, $group = 'default', $ttl = 0)
     {
+	    if ( empty( $group ) ) {
+		    $group = 'default';
+	    }
+
+	    if ( is_object( $var ) ) {
+		    $var = clone $var;
+	    }
+
+	    $this->cache[ $group ][ $key ] = $var;
+
         $key = $this->buildKey($key, $group);
 
         $ttl = max(intval($ttl), 0);
 
-        $var = var_export($var, true);
+        if ( is_object($var) && ! method_exists($var, '__set_state') && ! $var instanceof stdClass ) {
+            $var = serialize($var);
+	        $var = var_export($var, true);
+	        $var = 'unserialize('.$var.')';
+        } else {
+	        $var = var_export($var, true);
+        }
 
         // HHVM fails at __set_state, so just use object cast for now
         $var = str_replace('stdClass::__set_state', '(object)', $var);
@@ -718,7 +780,7 @@ class WP_Object_Cache
      */
     protected function filePath($key)
     {
-        return $this->directory . '/' . WP_OPCACHE_KEY_SALT . '-' . sha1($key) . '.php';
+        return $this->directory . '/' . WP_OPCACHE_KEY_SALT . '-' . md5($key) . '.php';
     }
 
 
@@ -739,11 +801,10 @@ class WP_Object_Cache
         touch( $file_path, $this->start_time - 10 );
         $return = rename( $tmp, $file_path );
 
-        if ( $this->enabled ) {
+        if ($this->enabled) {
 	        @opcache_invalidate( $file_path, true );
 	        @opcache_compile_file( $file_path );
         }
-
 	    return $return;
     }
 
