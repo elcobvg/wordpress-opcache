@@ -1,3 +1,4 @@
+.DS_Store
 *.log
 wp-config.php
 wp-content/advanced-cache.php
