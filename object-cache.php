@@ -743,7 +743,20 @@ class WP_Object_Cache
 
         $ttl = max(intval($ttl), 0);
 
-        if ( is_object($var) && ! method_exists($var, '__set_state') && ! $var instanceof stdClass ) {
+		$has_object = false;
+
+        if ( is_array($var) ) {
+        	array_walk_recursive(
+        		$var,
+				function ($value) use (&$has_object) {
+					if ( is_object($value) && ! method_exists($value, '__set_state') && ! $value instanceof stdClass ) {
+						$has_object = true;
+						return false;
+					}
+				}
+			);
+		}
+        if ( $has_object || ( is_object($var) && ! method_exists($var, '__set_state') && ! $var instanceof stdClass ) ) {
             $var = serialize($var);
 	        $var = var_export($var, true);
 	        $var = 'unserialize('.$var.')';
