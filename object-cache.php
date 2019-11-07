@@ -370,8 +370,8 @@ class WP_Object_Cache
 
         $this->directory    = WP_CONTENT_DIR . '/cache';
         $this->base_name    = basename(ABSPATH);
-        $this->enabled      = function_exists('opcache_invalidate') 
-                && ('cli' !== \PHP_SAPI || filter_var(ini_get('opcache.enable_cli'), FILTER_VALIDATE_BOOLEAN)) 
+        $this->enabled      = function_exists('opcache_invalidate')
+                && ('cli' !== \PHP_SAPI || filter_var(ini_get('opcache.enable_cli'), FILTER_VALIDATE_BOOLEAN))
                 && filter_var(ini_get('opcache.enable'), FILTER_VALIDATE_BOOLEAN);
         $this->multi_site   = is_multisite();
         $this->blog_prefix  = $this->multi_site ? (int) $blog_id : 1;
@@ -450,6 +450,20 @@ class WP_Object_Cache
     public function delete($key, $group = 'default', $deprecated = false)
     {
         unset($deprecated);
+
+	    if ( empty( $group ) ) {
+		    $group = 'default';
+	    }
+
+	    if ($this->multi_site && ! isset($this->global_groups[ $group ])) {
+		    $key = $this->blog_prefix . $key;
+	    }
+
+	    if ( ! $this->exists( $key, $group ) ) {
+		    return false;
+	    }
+
+	    unset( $this->cache[ $group ][ $key ] );
 
         $key = $this->buildKey($key, $group);
 
@@ -610,7 +624,7 @@ class WP_Object_Cache
                 $success = false;
             }
         }
-        
+
         if ($success) {
             $this->cache_hits++;
         } else {
@@ -832,7 +846,7 @@ class WP_Object_Cache
      */
     protected function expiration($seconds)
     {
-        return $seconds === 0 ? 9999999999 : strtotime('+' . $seconds . ' seconds');
+        return $seconds === 0 ? 99999999999 : strtotime('+' . $seconds . ' seconds');
     }
 
     /**
