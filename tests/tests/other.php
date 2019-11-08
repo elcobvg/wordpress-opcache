@@ -4,7 +4,7 @@ class OpcacheUnitTestsAll extends OpcacheUnitTests
 {
     public function test_disabled()
     {
-        $this->assertFalse($this->object_cache->getOpcacheEnabled());
+        $this->assertFalse($this->object_cache->get_opcache_enabled());
     }
 
     public function test_flush()

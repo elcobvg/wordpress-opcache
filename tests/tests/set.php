@@ -57,7 +57,6 @@ class OpcacheUnitTestsSet extends OpcacheUnitTests
         $key = 'usa';
         $value = 'merica';
         $group = 'july';
-        $built_key = $this->object_cache->buildKey($key, $group);
 
         // 30 days
         $expiration = 60 * 60 * 24 * 30;
@@ -73,7 +72,6 @@ class OpcacheUnitTestsSet extends OpcacheUnitTests
         $key = 'usa';
         $value = 'merica';
         $group = 'july';
-        $built_key = $this->object_cache->buildKey($key, $group);
 
         // 30 days and 1 second; if interpreted as timestamp, becomes "Sat, 31 Jan 1970 00:00:01 GMT"
         $expiration = 60 * 60 * 24 * 30 + 1;
