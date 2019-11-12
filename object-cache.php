@@ -228,33 +228,6 @@ function wp_cache_reset()
 
 
 /**
- * Invalidate a site's object cache
- *
- * @param mixed $sites Sites ID's that want flushing.
- *                     Don't pass a site to flush current site
- *
- * @return bool
- */
-function wp_cache_flush_site($sites = null)
-{
-    return WP_Object_Cache::instance()->flush_sites($sites);
-}
-
-
-/**
- * Invalidate a groups object cache
- *
- * @param mixed $groups A group or an array of groups to invalidate
- *
- * @return bool
- */
-function wp_cache_flush_group($groups = 'default')
-{
-    return WP_Object_Cache::instance()->flush_groups($groups);
-}
-
-
-/**
  * WordPress OPcache Object Cache Driver
  *
  * The WordPress Object Cache is used to save on trips to the database.
@@ -278,7 +251,7 @@ class WP_Object_Cache
     /**
      * @var string The file cache directory.
      */
-    protected $directory;
+    private $directory;
 
     /**
      * @var string Slug of the current blog name
@@ -296,7 +269,7 @@ class WP_Object_Cache
      * @var int The sites current blog ID. This only
      *    differs if running a multi-site installations
      */
-    private $blog_prefix = 1;
+    private $blog_prefix = '';
 
 
     /**
@@ -323,9 +296,58 @@ class WP_Object_Cache
     /**
      * @var bool True if the current installation is a multi-site
      */
-    private $multi_site = false;
+    private $multisite = false;
 
     protected $start_time;
+
+
+	/**
+	 * Makes private properties readable for backward compatibility.
+	 *
+	 * @since 4.0.0
+	 *
+	 * @param string $name Property to get.
+	 * @return mixed Property.
+	 */
+	public function __get( $name ) {
+		return $this->$name;
+	}
+
+	/**
+	 * Makes private properties settable for backward compatibility.
+	 *
+	 * @since 4.0.0
+	 *
+	 * @param string $name  Property to set.
+	 * @param mixed  $value Property value.
+	 * @return mixed Newly-set property.
+	 */
+	public function __set( $name, $value ) {
+		return $this->$name = $value;
+	}
+
+	/**
+	 * Makes private properties checkable for backward compatibility.
+	 *
+	 * @since 4.0.0
+	 *
+	 * @param string $name Property to check if set.
+	 * @return bool Whether the property is set.
+	 */
+	public function __isset( $name ) {
+		return isset( $this->$name );
+	}
+
+	/**
+	 * Makes private properties un-settable for backward compatibility.
+	 *
+	 * @since 4.0.0
+	 *
+	 * @param string $name Property to unset.
+	 */
+	public function __unset( $name ) {
+		unset( $this->$name );
+	}
 
 
     /**
@@ -358,8 +380,6 @@ class WP_Object_Cache
      */
     public function __construct()
     {
-        global $blog_id;
-
         if (!defined('WP_OPCACHE_KEY_SALT')) {
             /**
              * Set in config if you are using some sort of shared
@@ -368,18 +388,14 @@ class WP_Object_Cache
             define('WP_OPCACHE_KEY_SALT', 'wp-opcache');
         }
 
-        $this->directory    = WP_CONTENT_DIR . '/cache';
-        $this->base_name    = basename(ABSPATH);
-        $this->enabled      = function_exists('opcache_invalidate') 
-                && ('cli' !== \PHP_SAPI || filter_var(ini_get('opcache.enable_cli'), FILTER_VALIDATE_BOOLEAN)) 
+        $this->directory   = WP_CONTENT_DIR . '/cache';
+        $this->base_name   = basename(ABSPATH);
+        $this->enabled     = function_exists('opcache_invalidate')
+                && ('cli' !== \PHP_SAPI || filter_var(ini_get('opcache.enable_cli'), FILTER_VALIDATE_BOOLEAN))
                 && filter_var(ini_get('opcache.enable'), FILTER_VALIDATE_BOOLEAN);
-        $this->multi_site   = is_multisite();
-        $this->blog_prefix  = $this->multi_site ? (int) $blog_id : 1;
-        $this->start_time   = isset($_SERVER['REQUEST_TIME']) ? $_SERVER['REQUEST_TIME'] : time();
-
-        if (!file_exists($this->directory)) {
-            mkdir($this->directory, 0755, true);
-        }
+        $this->multisite   = is_multisite();
+        $this->blog_prefix = $this->multisite ? get_current_blog_id() . ':' : '';
+        $this->start_time  = isset($_SERVER['REQUEST_TIME']) ? $_SERVER['REQUEST_TIME'] : time();
     }
 
 
@@ -398,10 +414,6 @@ class WP_Object_Cache
         if (wp_suspend_cache_addition() || $this->exists($key, $group)) {
             return false;
         }
-        if ($this->multi_site && ! isset($this->global_groups[ $group ])) {
-            $key = $this->blog_prefix . $key;
-        }
-
         return $this->set($key, $var, $group, $ttl);
     }
 
@@ -451,12 +463,24 @@ class WP_Object_Cache
     {
         unset($deprecated);
 
-        $key = $this->buildKey($key, $group);
+	    if ( empty( $group ) ) {
+		    $group = 'default';
+	    }
+
+	    if ( ! $this->exists( $key, $group ) ) {
+		    return false;
+	    }
+
+	    if ( $this->multisite && ! isset($this->global_groups[ $group ])) {
+		    $key = $this->blog_prefix . $key;
+	    }
+
+	    unset( $this->cache[ $group ][ $key ] );
 
         if ($this->enabled) {
-            opcache_invalidate($this->filePath($key), true);
+            opcache_invalidate($this->filePath($key, $group), true);
         }
-        return @unlink($this->filePath($key));
+        return unlink($this->filePath($key, $group));
     }
 
 
@@ -470,14 +494,16 @@ class WP_Object_Cache
      */
     private function exists($key, $group)
     {
-        if (isset($this->cache[ $group ]) && ( isset($this->cache[ $group ][ $key ]) || array_key_exists($key, $this->cache[ $group ]))) {
+	    if ( $this->multisite && ! isset($this->global_groups[ $group ])) {
+		    $key = $this->blog_prefix . $key;
+	    }
+
+	    if (isset($this->cache[ $group ]) && ( isset($this->cache[ $group ][ $key ]) || array_key_exists($key, $this->cache[ $group ]))) {
             return true;
         }
 
-        $key = $this->buildKey($key, $group);
-
-        return $this->enabled && opcache_is_script_cached($this->filePath($key))
-            || file_exists($this->filePath($key));
+	    return $this->enabled && opcache_is_script_cached($this->filePath($key, $group))
+            || file_exists($this->filePath($key, $group));
     }
 
 
@@ -488,66 +514,34 @@ class WP_Object_Cache
      */
     public function flush()
     {
-        $files = glob($this->directory . '/*');
+	    $this->cache = array();
 
-        if ($this->enabled) {
-            array_map('opcache_invalidate', $files);
-        }
-        return (bool) array_map('unlink', $files);
+	    $directories = array( $this->directory );
+	    while( $directory_name = array_pop( $directories ) ) {
+		    $dir_handle = opendir( $directory_name );
+
+		    if( $dir_handle) {
+			    while ( false !== ( $file = readdir( $dir_handle ) ) ) {
+				    if ( ( '.' !== $file ) && ( '..' !== $file ) ) {
+					    $full = $directory_name . '/' . $file;
+					    if ( is_dir( $full ) ) {
+						    array_push( $directories, $full );
+					    } else {
+						    unlink( $full );
+						    if ( $this->enabled ) {
+							    opcache_invalidate( $full );
+						    }
+					    }
+				    }
+			    }
+
+			    closedir( $dir_handle );
+		    }
+	    }
+//	    rmdir( $directory_name );
+
+	    return true;
     }
-
-
-    /**
-     * Invalidate a groups object cache
-     *
-     * @param mixed $groups A group or an array of groups to invalidate
-     *
-     * @return bool
-     */
-    public function flush_groups($groups)
-    {
-        $groups = (array) $groups;
-
-        if (empty($groups)) {
-            return false;
-        }
-
-        foreach ($groups as $group) {
-            // TODO: unset groups
-        }
-
-        return true;
-    }
-
-
-    /**
-     * Invalidate a site's object cache
-     *
-     * @param mixed $sites Sites ID's that want flushing.
-     *                     Don't pass a site to flush current site
-     *
-     * @return bool
-     */
-    public function flush_sites($sites)
-    {
-        $sites = (array) $sites;
-
-        if (empty($sites)) {
-            $sites = array( $this->blog_prefix );
-        }
-
-        // Add global groups (site 0) to be flushed.
-        if (!in_array(0, $sites)) {
-            $sites[] = 0;
-        }
-
-        foreach ($sites as $site) {
-            // TODO: unset groups
-        }
-
-        return true;
-    }
-
 
     /**
      * Retrieves the cache contents, if it exists
@@ -575,7 +569,7 @@ class WP_Object_Cache
             $group = 'default';
         }
 
-        if ($this->multi_site && ! isset($this->global_groups[ $group ])) {
+        if ( $this->multisite && ! isset($this->global_groups[ $group ])) {
             $key = $this->blog_prefix . $key;
         }
 
@@ -589,7 +583,7 @@ class WP_Object_Cache
             }
         }
 
-        $result = @include $this->filePath($this->buildKey($key, $group));
+        $result = @include $this->filePath($key, $group);
         if (false === $result) {
             // file did not exist.
             $success = false;
@@ -610,7 +604,7 @@ class WP_Object_Cache
                 $success = false;
             }
         }
-        
+
         if ($success) {
             $this->cache_hits++;
         } else {
@@ -674,28 +668,19 @@ class WP_Object_Cache
             return false;
         }
 
-        $var = (int) $this->get($key, $group) + $offset;
-        return $this->set($key, $var, $group) ? $var : false;
-    }
-
-
-    /**
-     * Works out a cache key based on a given key and group
-     *
-     * @param int|string $key   The key
-     * @param string     $group The group
-     *
-     * @return string Returns the calculated cache key
-     */
-    public function buildKey($key, $group = 'default')
-    {
-        $prefix = 0;
-
-        if (!isset($this->global_groups[$group])) {
-            $prefix = $this->blog_prefix;
+        $value = $this->get($key, $group);
+        if ( ! is_numeric( $value ) ) {
+        	$value = 0;
         }
 
-        return $this->base_name . ':' . $prefix . ':' . $group . ':' . $key;
+        $offset = (int) $offset;
+
+        $value += $offset;
+
+        if ( $value < 0 ) {
+        	$value = 0;
+        }
+        return $this->set($key, $value, $group) ? $value : false;
     }
 
 
@@ -739,13 +724,28 @@ class WP_Object_Cache
             $var = clone $var;
         }
 
-        $this->cache[ $group ][ $key ] = $var;
+	    if ( $this->multisite && ! isset($this->global_groups[ $group ])) {
+		    $key = $this->blog_prefix . $key;
+	    }
 
-        $key = $this->buildKey($key, $group);
+        $this->cache[ $group ][ $key ] = $var;
 
         $ttl = max(intval($ttl), 0);
 
-        if (is_object($var) && ! method_exists($var, '__set_state') && ! $var instanceof stdClass) {
+        $has_object = false;
+
+        if ( is_array($var) ) {
+            array_walk_recursive(
+                $var,
+		        function ($value) use (&$has_object) {
+                    if ( is_object($value) && ! method_exists($value, '__set_state') && ! $value instanceof stdClass ) {
+                        $has_object = true;
+                        return false;
+                    }
+                }
+            );
+        }
+        if ( $has_object || ( is_object($var) && ! method_exists($var, '__set_state') && ! $var instanceof stdClass ) ) {
             $var = serialize($var);
             $var = var_export($var, true);
             $var = 'unserialize('.$var.')';
@@ -756,7 +756,7 @@ class WP_Object_Cache
         // HHVM fails at __set_state, so just use object cast for now
         $var = str_replace('stdClass::__set_state', '(object)', $var);
 
-        return $this->writeFile($key, $this->expiration($ttl), $var);
+        return $this->writeFile($key, $group, $this->expiration($ttl), $var);
     }
 
 
@@ -770,7 +770,7 @@ class WP_Object_Cache
     public function switch_to_blog($blog_id)
     {
         $blog_id           = (int) $blog_id;
-        $this->blog_prefix = $this->multi_site ? $blog_id : 1;
+        $this->blog_prefix = $this->multisite ? $blog_id . ':' : '';
     }
 
 
@@ -778,11 +778,12 @@ class WP_Object_Cache
      * Get fully qualified file path
      *
      * @param  string  $key
+     * @param  string  $group
      * @return string
      */
-    protected function filePath($key)
+    protected function filePath($key, $group)
     {
-        return $this->directory . '/' . WP_OPCACHE_KEY_SALT . '-' . md5($key) . '.php';
+        return $this->directory . DIRECTORY_SEPARATOR . $group . DIRECTORY_SEPARATOR . WP_OPCACHE_KEY_SALT . '-' . md5( $this->base_name . $key) . '.php';
     }
 
 
@@ -790,16 +791,23 @@ class WP_Object_Cache
      * Write the cache file to disk
      *
      * @param   string $key
+     * @param   string $group
      * @param   int    $exp
      * @param   mixed  $var
      * @return  bool
      */
-    protected function writeFile($key, $exp, $var)
+    protected function writeFile($key, $group, $exp, $var)
     {
-        // Write to temp file first to ensure atomicity. Use crc32 for speed
+	    // Write to temp file first to ensure atomicity. Use crc32 for speed
         $tmp = $this->directory . '/' . crc32($key) . '-' . uniqid('', true) . '.tmp';
         file_put_contents($tmp, '<?php return array('. $exp . ',' . $var . ');', LOCK_EX);
-        $file_path = $this->filePath($key);
+        $file_path = $this->filePath( $key, $group );
+
+        $dir = dirname( $file_path );
+	    if ( ! file_exists( $dir ) ) {
+		    mkdir( $dir, 0755, true );
+	    }
+
         touch($file_path, $this->start_time - 10);
         $return = rename($tmp, $file_path);
 
@@ -819,59 +827,14 @@ class WP_Object_Cache
      */
     protected function expiration($seconds)
     {
-        return $seconds === 0 ? 9999999999 : strtotime('+' . $seconds . ' seconds');
+        return $seconds === 0 ? 99999999999 : strtotime('+' . $seconds . ' seconds');
     }
 
     /**
      * @return boolean
      */
-    public function getOpcacheEnabled()
+    public function get_opcache_enabled()
     {
         return $this->enabled;
-    }
-
-
-    /**
-     * @return int
-     */
-    public function getBlogPrefix()
-    {
-        return $this->blog_prefix;
-    }
-
-
-    /**
-     * @return int
-     */
-    public function getCacheHits()
-    {
-        return $this->cache_hits;
-    }
-
-
-    /**
-     * @return int
-     */
-    public function getCacheMisses()
-    {
-        return $this->cache_misses;
-    }
-
-
-    /**
-     * @return array
-     */
-    public function getGlobalGroups()
-    {
-        return $this->global_groups;
-    }
-
-
-    /**
-     * @return boolean
-     */
-    public function get_multiSite()
-    {
-        return $this->multi_site;
     }
 }

@@ -34,7 +34,6 @@ class OpcacheUnitTestsReplace extends OpcacheUnitTests
         $key = 'usa';
         $value = 'merica';
         $group = 'july';
-        $built_key = $this->object_cache->buildKey($key, $group);
 
         $value2 = 'belgium';
 
@@ -53,7 +52,6 @@ class OpcacheUnitTestsReplace extends OpcacheUnitTests
         $key = 'usa';
         $value = 'merica';
         $group = 'july';
-        $built_key = $this->object_cache->buildKey($key, $group);
 
         $value2 = 'belgium';
 
