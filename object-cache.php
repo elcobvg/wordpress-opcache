@@ -804,9 +804,9 @@ class WP_Object_Cache
         $file_path = $this->filePath( $key, $group );
 
         $dir = dirname( $file_path );
-	    if ( ! file_exists( $dir ) ) {
-		    mkdir( $dir, 0755, true );
-	    }
+	    if ( ! file_exists($dir) && ! mkdir($dir, 0755, true) && ! is_dir($dir)) {
+            throw new RuntimeException(sprintf('Directory "%s" was not created', $dir));
+        }
 
         touch($file_path, $this->start_time - 10);
         $return = rename($tmp, $file_path);
