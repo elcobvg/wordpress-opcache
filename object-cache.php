@@ -355,7 +355,7 @@ class WP_Object_Cache
      *
      * @return WP_Object_Cache
      */
-    public static function instance()
+    public static function instance(): WP_Object_Cache
     {
         static $inst = null;
 
@@ -459,7 +459,7 @@ class WP_Object_Cache
      *
      * @return bool False if the contents weren't deleted and true on success
      */
-    public function delete($key, $group = 'default', $deprecated = false)
+    public function delete($key, $group = 'default', $deprecated = false): bool
     {
         unset($deprecated);
 
@@ -492,7 +492,7 @@ class WP_Object_Cache
      *
      * @return bool True if cache key exists else false
      */
-    private function exists($key, $group)
+    private function exists($key, $group): bool
     {
 	    if ( $this->multisite && ! isset($this->global_groups[ $group ])) {
 		    $key = $this->blog_prefix . $key;
@@ -512,7 +512,7 @@ class WP_Object_Cache
      *
      * @return bool Always returns true
      */
-    public function flush()
+    public function flush(): bool
     {
 	    $this->cache = array();
 
@@ -628,7 +628,7 @@ class WP_Object_Cache
      *    array( 'group0' => array( 'key0' => 'value0', 'key1' => 'value1', 'key2' => 'value2', ) )
      *    Non-existent keys are not returned.
      */
-    public function get_multi($groups)
+    public function get_multi($groups): array
     {
         if (empty($groups) || !is_array($groups)) {
             return array();
@@ -694,7 +694,7 @@ class WP_Object_Cache
      *
      * @return bool False if not exists, true if contents were replaced
      */
-    public function replace($key, $var, $group = 'default', $ttl = 0)
+    public function replace($key, $var, $group = 'default', $ttl = 0): bool
     {
         if (!$this->exists($key, $group)) {
             return false;
@@ -714,7 +714,7 @@ class WP_Object_Cache
      *
      * @return bool True if cache set successfully else false
      */
-    public function set($key, $var, $group = 'default', $ttl = 0)
+    public function set($key, $var, $group = 'default', $ttl = 0): bool
     {
         if (empty($group)) {
             $group = 'default';
@@ -781,7 +781,7 @@ class WP_Object_Cache
      * @param  string  $group
      * @return string
      */
-    protected function filePath($key, $group)
+    protected function filePath($key, $group): string
     {
         return $this->directory . DIRECTORY_SEPARATOR . $group . DIRECTORY_SEPARATOR . WP_OPCACHE_KEY_SALT . '-' . md5( $this->base_name . $key) . '.php';
     }
@@ -796,7 +796,7 @@ class WP_Object_Cache
      * @param   mixed  $var
      * @return  bool
      */
-    protected function writeFile($key, $group, $exp, $var)
+    protected function writeFile($key, $group, $exp, $var): bool
     {
 	    // Write to temp file first to ensure atomicity. Use crc32 for speed
         $tmp = $this->directory . '/' . crc32($key) . '-' . uniqid('', true) . '.tmp';
@@ -825,7 +825,7 @@ class WP_Object_Cache
      * @param  float|int  $seconds
      * @return int
      */
-    protected function expiration($seconds)
+    protected function expiration($seconds): int
     {
         return $seconds === 0 ? 99999999999 : strtotime('+' . $seconds . ' seconds');
     }
@@ -833,7 +833,7 @@ class WP_Object_Cache
     /**
      * @return boolean
      */
-    public function get_opcache_enabled()
+    public function get_opcache_enabled(): bool
     {
         return $this->enabled;
     }
