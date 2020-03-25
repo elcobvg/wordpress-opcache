@@ -575,7 +575,7 @@ class WP_Object_Cache
 
         if (isset($this->cache[ $group ]) && ( isset($this->cache[ $group ][ $key ]) || array_key_exists($key, $this->cache[ $group ]) )) {
             $success             = true;
-            $this->cache_hits += 1;
+            ++$this->cache_hits;
             if (is_object($this->cache[ $group ][ $key ])) {
                 return clone $this->cache[ $group ][ $key ];
             } else {
