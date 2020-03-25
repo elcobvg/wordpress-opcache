@@ -643,9 +643,9 @@ class WP_Object_Cache
             ++$this->cache_hits;
             if (is_object($this->cache[$group][$key])) {
                 return clone $this->cache[$group][$key];
-            } else {
-                return $this->cache[$group][$key];
             }
+
+            return $this->cache[$group][$key];
         }
 
         $result = @include $this->filePath($key, $group);
