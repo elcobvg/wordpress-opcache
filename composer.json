@@ -1,5 +1,21 @@
 {
-    "require": {
-        "phpunit/phpunit": "^6.5"
-    }
+  "name": "elcobvg/wordpress-opcache",
+  "description": "OPcache Object Cache plugin for WordPress. Faster than Redis, Memcache or APC.",
+  "license": "GPL-3.0-or-later",
+  "type": "wordpress-dropin",
+  "keywords": [
+    "wordpress",
+    "opcache",
+    "php"
+  ],
+  "support": {
+    "issues": "https://github.com/elcobvg/wordpress-opcache/issues"
+  },
+  "require": {
+    "php": ">=7",
+    "ext-zend-opcache": "*"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^6.5"
+  }
 }
