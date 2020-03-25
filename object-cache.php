@@ -730,7 +730,7 @@ class WP_Object_Cache
 
         $this->cache[ $group ][ $key ] = $var;
 
-        $ttl = max(intval($ttl), 0);
+        $ttl = max((int)$ttl, 0);
 
         $has_object = false;
 
