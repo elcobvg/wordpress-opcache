@@ -395,7 +395,7 @@ class WP_Object_Cache
                 && filter_var(ini_get('opcache.enable'), FILTER_VALIDATE_BOOLEAN);
         $this->multisite   = is_multisite();
         $this->blog_prefix = $this->multisite ? get_current_blog_id() . ':' : '';
-        $this->start_time  = isset($_SERVER['REQUEST_TIME']) ? $_SERVER['REQUEST_TIME'] : time();
+        $this->start_time  = $_SERVER['REQUEST_TIME'] ?? time();
     }
 
 
