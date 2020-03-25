@@ -482,6 +482,7 @@ class WP_Object_Cache
 
                         return false;
                     }
+                    return true;
                 }
             );
         }
