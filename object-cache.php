@@ -525,7 +525,7 @@ class WP_Object_Cache
 				    if ( ( '.' !== $file ) && ( '..' !== $file ) ) {
 					    $full = $directory_name . '/' . $file;
 					    if ( is_dir( $full ) ) {
-						    array_push( $directories, $full );
+						    $directories[] = $full;
 					    } else {
 						    unlink( $full );
 						    if ( $this->enabled ) {
