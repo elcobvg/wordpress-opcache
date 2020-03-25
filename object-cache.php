@@ -256,20 +256,20 @@ class WP_Object_Cache
     /**
      * @var string Slug of the current blog name
      */
-    private $base_name = '';
+    private $base_name;
 
 
     /**
      * @var bool Stores if OPcache is available.
      */
-    private $enabled = false;
+    private $enabled;
 
 
     /**
      * @var int The sites current blog ID. This only
      *    differs if running a multi-site installations
      */
-    private $blog_prefix = '';
+    private $blog_prefix;
 
 
     /**
@@ -296,7 +296,7 @@ class WP_Object_Cache
     /**
      * @var bool True if the current installation is a multi-site
      */
-    private $multisite = false;
+    private $multisite;
 
     protected $start_time;
 
@@ -409,7 +409,7 @@ class WP_Object_Cache
      *
      * @return bool False if cache key and group already exist, true on success
      */
-    public function add($key, $var, $group = 'default', $ttl = 0)
+    public function add($key, $var, $group = 'default', $ttl = 0): bool
     {
         if (wp_suspend_cache_addition() || $this->exists($key, $group)) {
             return false;
