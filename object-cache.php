@@ -502,8 +502,8 @@ class WP_Object_Cache
             return true;
         }
 
-	    return $this->enabled && opcache_is_script_cached($this->filePath($key, $group))
-            || file_exists($this->filePath($key, $group));
+	    return ($this->enabled && opcache_is_script_cached($this->filePath($key, $group)))
+               || file_exists($this->filePath($key, $group));
     }
 
 
