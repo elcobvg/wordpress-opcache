@@ -737,7 +737,7 @@ class WP_Object_Cache
         if ( is_array($var) ) {
             array_walk_recursive(
                 $var,
-		        function ($value) use (&$has_object) {
+		        static function ($value) use (&$has_object) {
                     if ( is_object($value) && ! method_exists($value, '__set_state') && ! $value instanceof stdClass ) {
                         $has_object = true;
                         return false;
