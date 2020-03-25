@@ -1,12 +1,12 @@
 <?php
 /*
 Plugin Name: Wordpress OPcache Cache Plugin
-Plugin URI: https://github.com/elcobvg/wordpress-opcache
+Plugin URI:  https://github.com/elcobvg/wordpress-opcache
 Description: OPcache Object Cache plugin for WordPress. Faster than Redis, Memcache or APC.
-Version: 0.2.0
-Author: Elco Brouwer von Gonzenbach <elco.brouwer@gmail.com>
-Author URI: https://www.linkedin.com/in/elcobrouwervongonzenbach/
-License: GPLv3
+Version:     0.2.0
+Author:      Elco Brouwer von Gonzenbach <elco.brouwer@gmail.com>
+Author URI:  https://www.linkedin.com/in/elcobrouwervongonzenbach/
+License:     GPLv3
 License URI: http://www.gnu.org/licenses/gpl-3.0.html
 */
 
