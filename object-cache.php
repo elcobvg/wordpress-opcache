@@ -814,6 +814,7 @@ class WP_Object_Cache
      * This changes the blog id used to create keys in blog specific groups.
      *
      * @param int $blog_id Blog ID
+     * @return int|string Blog ID
      */
     public function switch_to_blog($blog_id)
     {
