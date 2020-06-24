@@ -1,5 +1,7 @@
 <?xml version="1.0"?>
 <psalm
+    errorLevel="7"
+    resolveFromConfigFile="true"
     autoloader="./.psalm/autoloader.php"
     totallyTyped="true"
     useDocblockTypes="true"
@@ -25,13 +27,9 @@
     xsi:schemaLocation="https://getpsalm.org/schema/config vendor/vimeo/psalm/config.xsd"
 >
     <projectFiles>
-        <directory name="src"/>
+        <file name="object-cache.php" />
         <ignoreFiles>
             <directory name="vendor" />
         </ignoreFiles>
     </projectFiles>
-
-   <issueHandlers>
-        <MixedAssignment errorLevel="suppress" />
-    </issueHandlers>
 </psalm>
