@@ -583,7 +583,10 @@ class WP_Object_Cache
             }
         }
 
-        $result = @include $this->filePath($key, $group);
+	$result = false;
+        if (file_exists($file_path = $this->filePath($key, $group))) {
+                $result = include $file_path;
+        }
         if (false === $result) {
             // file did not exist.
             $success = false;
